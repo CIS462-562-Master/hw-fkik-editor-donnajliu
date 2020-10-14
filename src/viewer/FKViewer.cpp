@@ -1,5 +1,7 @@
 #include "FKViewer.h"
-#include <filesystem>
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
+
 
 FKViewer::FKViewer(const std::string & name) :
 	Viewer(name)

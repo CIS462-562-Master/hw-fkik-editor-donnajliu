@@ -12,33 +12,33 @@ ASplineQuat::~ASplineQuat()
 
 void ASplineQuat::setInterpolationType(ASplineQuat::InterpolationType type)
 {
-    mType = type;
-    cacheCurve();
+	mType = type;
+	cacheCurve();
 }
 
 ASplineQuat::InterpolationType ASplineQuat::getInterpolationType() const
 {
-    return mType;
+	return mType;
 }
 
 void ASplineQuat::setLooping(bool loop)
 {
-    mLooping = loop;
+	mLooping = loop;
 }
 
 bool ASplineQuat::getLooping() const
 {
-    return mLooping;
+	return mLooping;
 }
 
 void ASplineQuat::setFramerate(double fps)
 {
-    mDt = 1.0 / fps;
+	mDt = 1.0 / fps;
 }
 
 double ASplineQuat::getFramerate() const
 {
-    return 1.0 / mDt;
+	return 1.0 / mDt;
 }
 
 int ASplineQuat::getCurveSegment(double time)
@@ -60,7 +60,7 @@ int ASplineQuat::getCurveSegment(double time)
 			double keyTime0 = mKeys[segment].first;
 			double keyTime1 = mKeys[segment + 1].first;
 			if ((t >= keyTime0) && (t < keyTime1))
-				 foundSegment = true;
+				foundSegment = true;
 			else segment++;
 		}
 	}
@@ -105,7 +105,7 @@ void ASplineQuat::cacheCurve()
 	if (mType == CUBIC && numKeys >= 2)
 	{
 		quat startQuat = mKeys[0].second;
-		quat endQuat = mKeys[numKeys-1].second;
+		quat endQuat = mKeys[numKeys - 1].second;
 
 		computeControlPoints(startQuat, endQuat);
 		createSplineCurveCubic();
@@ -130,7 +130,51 @@ void ASplineQuat::computeControlPoints(quat& startQuat, quat& endQuat)
 		//  for each cubic quaternion curve, then store the results in mCntrlPoints in same the same way 
 		//  as was used with the SplineVec implementation
 		//  Hint: use the SDouble, SBisect and Slerp to compute b1 and b2
+		q0 = mKeys[segment].second;
+		q1 = mKeys[segment + 1].second;
+		b0 = q0;
+		b3 = q1;
 
+		if (segment == 0) {
+			/*if (numKeys == 2) {
+				q2 = endQuat;
+			}
+			else {
+				q2 = mKeys[segment + 2].second;
+			}
+			quat s0 = ((q2 - q1) + (q1 - q0)) / 2.0;
+			b1 = b0 + 1.0 / 3.0 * s0;*/
+			q_1 = startQuat;
+			quat q1p = quat::SDouble(q_1, q0);
+			quat q1s = quat::SBisect(q1p, q1);
+			b1 = quat::Slerp(q0, q1s, 1.0 / 3.0);
+		}
+		else {
+			q_1 = mKeys[segment - 1].second;
+			quat q1p = quat::SDouble(q_1, q0);
+			quat q1s = quat::SBisect(q1p, q1);
+			b1 = quat::Slerp(q0, q1s, 1.0 / 3.0);
+		}
+
+		if (segment == numKeys - 2) {
+			/*if (numKeys == 2) {
+				q2 = startQuat;
+			} else {
+				q2 = mKeys[numKeys - 1].second;
+			}
+			quat s1 = ((q2 - q1) + (q1 - q0)) / 2.0;
+			b2 = b3 - 1.0 / 3.0 * s1;*/
+			q2 = endQuat;
+			quat q0p = quat::SDouble(q2, q1);
+			quat q0s = quat::SBisect(q0, q0p);
+			b2 = quat::Slerp(q2, q0s, 1.0 / 3.0);
+		}
+		else {
+			q2 = mKeys[segment + 2].second;
+			quat q0p = quat::SDouble(q2, q1);
+			quat q0s = quat::SBisect(q0, q0p);
+			b2 = quat::Slerp(q2, q0s, 1.0 / 3.0);
+		}
 
 		mCtrlPoints.push_back(b0);
 		mCtrlPoints.push_back(b1);
@@ -147,8 +191,9 @@ quat ASplineQuat::getLinearValue(double t)
 
 	// TODO: student implementation goes here
 	// compute the value of a linear quaternion spline at the value of t using slerp
-
-	return q;	
+	double u = (t - mKeys[segment].first) / (mKeys[segment + 1].first - mKeys[segment].first);
+	q = quat::Slerp(mKeys[segment].second, mKeys[segment + 1].second, u);
+	return q;
 }
 
 void ASplineQuat::createSplineCurveLinear()
@@ -156,9 +201,9 @@ void ASplineQuat::createSplineCurveLinear()
 
 	quat q;
 	mCachedCurve.clear();
-	int numKeys = mKeys.size(); 
+	int numKeys = mKeys.size();
 	double startTime = mKeys[0].first;
-	double endTime = mKeys[numKeys-1].first;
+	double endTime = mKeys[numKeys - 1].first;
 
 	for (double t = startTime; t <= endTime; t += mDt)
 	{
@@ -175,7 +220,13 @@ quat ASplineQuat::getCubicValue(double t)
 
 	// TODO: student implementation goes here
 	// compute the value of a cubic quaternion spline at the value of t using Scubic
+	b0 = mCtrlPoints[4 * segment];
+	b1 = mCtrlPoints[4 * segment + 1];
+	b2 = mCtrlPoints[4 * segment + 2];
+	b3 = mCtrlPoints[4 * segment + 3];
 
+	double u = (t - mKeys[segment].first) / (mKeys[segment + 1].first - mKeys[segment].first);
+	q = quat::Scubic(b0, b1, b2, b3, u);
 	return q;
 }
 
@@ -197,22 +248,22 @@ void ASplineQuat::createSplineCurveCubic()
 
 void ASplineQuat::editKey(int keyID, const quat& value)
 {
-    assert(keyID >= 0 && keyID < mKeys.size());
-    mKeys[keyID].second = value;
+	assert(keyID >= 0 && keyID < mKeys.size());
+	mKeys[keyID].second = value;
 	cacheCurve();
 }
 
 void ASplineQuat::appendKey(const quat& value, bool updateCurve)
 {
-    if (mKeys.size() == 0)
-    {
-        appendKey(0, value, updateCurve);
-    }
-    else
-    {
-        double lastT = mKeys[mKeys.size() - 1].first;
-        appendKey(lastT + 1, value, updateCurve);
-    }
+	if (mKeys.size() == 0)
+	{
+		appendKey(0, value, updateCurve);
+	}
+	else
+	{
+		double lastT = mKeys[mKeys.size() - 1].first;
+		appendKey(lastT + 1, value, updateCurve);
+	}
 }
 
 int ASplineQuat::insertKey(double time, const quat& value, bool updateCurve)
@@ -240,41 +291,41 @@ int ASplineQuat::insertKey(double time, const quat& value, bool updateCurve)
 
 void ASplineQuat::appendKey(double t, const quat& value, bool updateCurve)
 {
-    mKeys.push_back(Key(t, value));
-    if (updateCurve) cacheCurve();
+	mKeys.push_back(Key(t, value));
+	if (updateCurve) cacheCurve();
 }
 
 void ASplineQuat::deleteKey(int keyID)
 {
-    assert(keyID >= 0 && keyID < mKeys.size());
-    mKeys.erase(mKeys.begin() + keyID);
+	assert(keyID >= 0 && keyID < mKeys.size());
+	mKeys.erase(mKeys.begin() + keyID);
 	cacheCurve();
 }
 
 quat ASplineQuat::getKey(int keyID)
 {
-    assert(keyID >= 0 && keyID < mKeys.size());
-    return mKeys[keyID].second;
+	assert(keyID >= 0 && keyID < mKeys.size());
+	return mKeys[keyID].second;
 }
 
 int ASplineQuat::getNumKeys() const
 {
-    return mKeys.size();
+	return mKeys.size();
 }
 
 void ASplineQuat::clear()
 {
-    mKeys.clear();
+	mKeys.clear();
 }
 
 double ASplineQuat::getDuration() const
 {
-    return mCachedCurve.size() * mDt;
+	return mCachedCurve.size() * mDt;
 }
 
 double ASplineQuat::getNormalizedTime(double t) const
 {
-    double duration = getDuration();
-    int rawi = (int)(t / duration);
-    return t - rawi*duration;
+	double duration = getDuration();
+	int rawi = (int)(t / duration);
+	return t - rawi * duration;
 }
