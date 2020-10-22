@@ -136,13 +136,22 @@ AIKchain IKController::createIKchain(int endJointID, int desiredChainSize, ASkel
 	std::vector<AJoint*> chain;
 	AJoint* currJoint = pSkeleton->getJointByID(endJointID);
 	std::vector<double> weights;
-
-	do {
-		chain.push_back(currJoint);
-		currJoint = currJoint->getParent();
-		weights.push_back(0.1);
-		desiredChainSize--;
-	} while (currJoint != pSkeleton->getRootNode() && desiredChainSize != 0);
+	
+	//if (desiredChainSize == -1) {
+		while ((currJoint->getID() != mRootID) && (desiredChainSize != 0)) {
+			chain.push_back(currJoint);
+			weights.push_back(0.1);
+			currJoint = currJoint->getParent();
+			desiredChainSize--;
+		}
+	/*}
+	else {
+		for (int i = 0; i < desiredChainSize; i++) {
+			chain.push_back(currJoint);
+			weights.push_back(0.1);
+			currJoint = currJoint->getParent();
+		}
+	}*/
 
 	AIKchain c = AIKchain();
 	c.setChain(chain);
@@ -162,7 +171,11 @@ bool IKController::IKSolver_Limb(int endJointID, const ATarget& target)
 	if (!mvalidLimbIKchains || createLimbIKchains())
 	{
 		//return false;
-		createLimbIKchains();
+		//createLimbIKchains();
+		/*mvalidLimbIKchains = createLimbIKchains();
+		if (!mvalidLimbIKchains) {
+			return false;
+		}*/
 	}
 
 	vec3 desiredRootPosition;
@@ -249,29 +262,28 @@ int IKController::computeLimbIK(ATarget target, AIKchain& IKchain, const vec3 mi
 	// TODO: Implement the analytic/geometric IK method assuming a three joint limb  
 	// The actual position of the end joint should match the target position within some episilon error 
 	// the variable "midJointAxis" contains the rotation axis for the middle joint
+	vec3 t = target.getGlobalTranslation() - IKchain.getJoint(2)->getGlobalTranslation();
 	vec3 rdv = IKchain.getJoint(0)->getGlobalTranslation() - IKchain.getJoint(2)->getGlobalTranslation();
-	vec3 rdx = target.getGlobalTranslation() - IKchain.getJoint(2)->getGlobalTranslation();
-	double rd = rdx.Length();
+	double rd = Distance(target.getGlobalTranslation(), IKchain.getJoint(2)->getGlobalTranslation());
 
-	double l1 = (IKchain.getJoint(1)->getGlobalTranslation() - IKchain.getJoint(2)->getGlobalTranslation()).Length();
-	double l2 = (target.getGlobalTranslation() - IKchain.getJoint(1)->getGlobalTranslation()).Length();
+	double l1 = Distance(IKchain.getJoint(1)->getGlobalTranslation(), IKchain.getJoint(2)->getGlobalTranslation());
+	double l2 = Distance(target.getGlobalTranslation(), IKchain.getJoint(1)->getGlobalTranslation());
 
-	double phi = acosf((l1 * l1 + l2 * l2 - rd * rd) / (2.0 * l1 * l2));
+	double phi = acos((l1 * l1 + l2 * l2 - rd * rd) / (2.0 * l1 * l2));
 	double theta2 = M_PI - phi;
 
 	mat3 m1, m2;
 	m1.FromAxisAngle(midJointAxis, theta2);
 	IKchain.getJoint(1)->setLocalRotation(m1);
 	
-	vec3 t = target.getGlobalTranslation() - IKchain.getJoint(2)->getGlobalTranslation();
-	double alpha = acosf(Dot(t, rdv) / (t.Length() * rdv.Length()));
+	double alpha = acos(Dot(t, rdv) / (t.Length() * rdv.Length()));
 	vec3 rootAxis = rdv.Cross(t) / (rdv.Cross(t).Length());
 
 	m2.FromAxisAngle(IKchain.getJoint(2)->getGlobalRotation().Transpose() * rootAxis, alpha);
 	IKchain.getJoint(2)->setLocalRotation(IKchain.getJoint(2)->getLocalRotation() * m2);
 		
 	pIKSkeleton->update();
-	return false;
+	return true;
 }
 
 bool IKController::IKSolver_CCD(int endJointID, const ATarget& target)
@@ -295,21 +307,29 @@ bool IKController::IKSolver_CCD(int endJointID, const ATarget& target)
 	if (endJointID == mLhandID)
 	{
 		mLhandTarget = target;
+		//computeCCDIK(mLhandTarget, mLhandIKchain, &mIKSkeleton);
 		computeCCDIK(mLhandTarget, mLhandIKchain, &mIKSkeleton);
+		computeCCDIK(mRhandTarget, mRhandIKchain, &mIKSkeleton);
 	}
 	else if (endJointID == mRhandID)
 	{
 		mRhandTarget = target;
+		//computeCCDIK(mRhandTarget, mRhandIKchain, &mIKSkeleton);
+		computeCCDIK(mLhandTarget, mLhandIKchain, &mIKSkeleton);
 		computeCCDIK(mRhandTarget, mRhandIKchain, &mIKSkeleton);
 	}
 	else if (endJointID == mLfootID)
 	{
 		mLfootTarget = target;
+		//computeCCDIK(mLfootTarget, mLfootIKchain, &mIKSkeleton);
 		computeCCDIK(mLfootTarget, mLfootIKchain, &mIKSkeleton);
+		computeCCDIK(mRfootTarget, mRfootIKchain, &mIKSkeleton);
 	}
 	else if (endJointID == mRfootID)
 	{
 		mRfootTarget = target;
+		//computeCCDIK(mRfootTarget, mRfootIKchain, &mIKSkeleton);
+		computeCCDIK(mLfootTarget, mLfootIKchain, &mIKSkeleton);
 		computeCCDIK(mRfootTarget, mRfootIKchain, &mIKSkeleton);
 	}
 	else if (endJointID == mRootID)
@@ -325,7 +345,11 @@ bool IKController::IKSolver_CCD(int endJointID, const ATarget& target)
 	else
 	{
 		mIKchain = createIKchain(endJointID, -1, &mIKSkeleton);
-		computeCCDIK(target, mIKchain, &mIKSkeleton);
+		//computeCCDIK(target, mIKchain, &mIKSkeleton);
+		computeCCDIK(mLhandTarget, mLhandIKchain, &mIKSkeleton);
+		computeCCDIK(mRhandTarget, mRhandIKchain, &mIKSkeleton);
+		computeCCDIK(mLfootTarget, mLfootIKchain, &mIKSkeleton);
+		computeCCDIK(mRfootTarget, mRfootIKchain, &mIKSkeleton);
 	}
 
 	// update IK Skeleton transforms
@@ -382,7 +406,7 @@ int IKController::computeCCDIK(ATarget target, AIKchain& IKchain, ASkeleton* pIK
 	AJoint* end = IKchain.getJoint(0);
 
 	for (int rep = 0; rep < 4; rep++) {
-		for (int i = 1; i < 3; i++) {
+		for (int i = 1; i < IKchain.getSize(); i++) {
 			double c = IKchain.getWeight(i);
 			AJoint* j = IKchain.getJoint(i);
 
@@ -397,6 +421,9 @@ int IKController::computeCCDIK(ATarget target, AIKchain& IKchain, ASkeleton* pIK
 			j->setLocalRotation(j->getLocalRotation() * m);
 
 			j->updateTransform();
+			for (int k = 0; k < j->getNumChildren(); k++) {
+				j->getChildAt(k)->updateTransform();
+			}
 		}
 
 		double error = (target.getGlobalTranslation() - end->getGlobalTranslation()).Length();
