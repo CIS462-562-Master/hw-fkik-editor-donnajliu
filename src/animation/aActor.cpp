@@ -154,7 +154,7 @@ void AActor::solveFootIK(float leftHeight, float rightHeight, bool rotateLeft, b
 	{
 		ATarget t;
 		vec3 rf = rightFoot->getGlobalTranslation();
-		t.setGlobalTranslation(vec3(rf[0], rightHeight, rf[2]));
+		t.setGlobalTranslation(vec3(rf[0], 0.0, rf[2]));
 
 		float angle = acos(Dot(leftNormal.Normalize(), vec3(0.0, 1.0, 0.0)));
 		vec3 axis = leftNormal.Normalize().Cross(vec3(0.0, 1.0, 0.0));
