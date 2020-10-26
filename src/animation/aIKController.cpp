@@ -136,22 +136,13 @@ AIKchain IKController::createIKchain(int endJointID, int desiredChainSize, ASkel
 	std::vector<AJoint*> chain;
 	AJoint* currJoint = pSkeleton->getJointByID(endJointID);
 	std::vector<double> weights;
-	
-	//if (desiredChainSize == -1) {
-		while ((currJoint->getID() != mRootID) && (desiredChainSize != 0)) {
-			chain.push_back(currJoint);
-			weights.push_back(0.1);
-			currJoint = currJoint->getParent();
-			desiredChainSize--;
-		}
-	/*}
-	else {
-		for (int i = 0; i < desiredChainSize; i++) {
-			chain.push_back(currJoint);
-			weights.push_back(0.1);
-			currJoint = currJoint->getParent();
-		}
-	}*/
+
+	while ((currJoint->getID() != mRootID) && (desiredChainSize != 0)) {
+		chain.push_back(currJoint);
+		weights.push_back(0.1);
+		currJoint = currJoint->getParent();
+		desiredChainSize--;
+	}
 
 	AIKchain c = AIKchain();
 	c.setChain(chain);
